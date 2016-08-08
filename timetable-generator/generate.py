@@ -39,6 +39,13 @@ import evaluation
 # default value
 tutors = ['Benedikt', 'Fabjan', 'Linus', 'Lukas', 'Mario', 'Neu']
 
+# pool of evaluation functions for optimization
+eval_func_dict = {
+   'piecewise_linear': evaluation.piecewise_linear,
+   'fuzzy': evaluation.fuzzy,
+}
+eval_func_str = 'fuzzy' # default evaluation function
+
 log_formatter = logging.Formatter('[%(levelname)s][%(name)s] %(message)s')
 
 OUTPUT_FILENAME = 'test_timetable_schedule.txt'
@@ -72,6 +79,9 @@ parser.add_argument('start', type=str,
                     help='Start time and date of the test. Specify in format d.m.Y H:M, e.g., 22.01.2016 08:00.')
 parser.add_argument('tutors', type=str, nargs='*', metavar='tutor', default=tutors,
                     help='Names of the tutors. Default tutors: ' + str(tutors))
+parser.add_argument('-O', '--optimize', type=str, 
+                    choices=['piecewise_linear', 'fuzzy'], default=eval_func_str,
+                    help='Evaluation function of optimization, default: ' + eval_func_str)
 args = parser.parse_args()
 
 start = datetime.datetime.strptime(args.start, '%d.%m.%Y %H:%M')
@@ -92,8 +102,11 @@ if len(args.tutors) < len(rooms):
 
 tutors = args.tutors
 
+eval_func_str = args.optimize
+
 log.debug('config: %d. Test (in lab rooms) starts at %s.' % (args.test, start.strftime('%H:%M')))
 log.debug('config: %d groups of students, %d rooms for computertest.' % (args.groups, len(rooms)))
+log.debug('config: evaluation function of genetic optimization = %s' % (eval_func_str))
 
 
 #
@@ -126,7 +139,7 @@ def eval_func(chromosome):
    # map chromosome (a generated schedule) to the timetable
    apply_genome(chromosome)
    # evaluate score of the timetable
-   score = evaluation.piecewise_linear(t, log.getEffectiveLevel())
+   score = eval_func_dict[eval_func_str](t, log.getEffectiveLevel())
    return score
 
 

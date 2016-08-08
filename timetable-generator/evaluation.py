@@ -20,6 +20,7 @@ def piecewise_linear(timetable, loglevel=logging.INFO):
     log = logging.getLogger("evaluation.piecewise_linear")
     log.setLevel(loglevel)
 
+    # init score
     score = 0.0
     log.debug('score: %.2f' %(score))
 
@@ -94,3 +95,21 @@ def piecewise_linear(timetable, loglevel=logging.INFO):
 
     return score
 
+
+##
+# Fuzzy evaluation function.
+##
+def fuzzy(timetable, loglevel=logging.INFO):
+
+    # fuzzy set = [unacceptable, fair, good, superior]
+    # membership function
+
+    # non-overlapping slots
+    # equal number of slots for each tutor
+    # equal overall time at test for each tutor
+    # no tutor changes (tutors should have consecutive slots in the same room)
+
+    # rules
+    # IF overlaps = unacceptable THEN evaluation = unacceptable
+
+    return 0.0
