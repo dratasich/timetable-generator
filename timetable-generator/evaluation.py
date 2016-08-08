@@ -11,6 +11,9 @@
 
 import logging
 import measures
+import numpy as np
+import skfuzzy
+import skfuzzy.control
 
 ##
 # Piecewise linear evaluation function.
@@ -58,10 +61,8 @@ def piecewise_linear(timetable, loglevel=logging.INFO):
 
     # non-overlapping slots
     weight = 10.0
-    maximum = len(timetable.get_slots()) * (len(timetable.rooms)-1)
-    reached = maximum
-    for tutor in timetable.tutors:
-        reached -= measures.count_overlaps_of_tutor(timetable, tutor)
+    cnt, maximum = measures.count_overlaps(timetable)
+    reached = maximum - cnt
     log.debug('[ %2.1f ] non-overlapping slots: %d / %d' % (weight, reached, maximum))
     score += weight * reached/maximum
     log.debug('score: %.2f' %(score))
@@ -96,20 +97,72 @@ def piecewise_linear(timetable, loglevel=logging.INFO):
     return score
 
 
-##
-# Fuzzy evaluation function.
-##
-def fuzzy(timetable, loglevel=logging.INFO):
+#
+# fuzzy logic
+#
 
-    # fuzzy set = [unacceptable, fair, good, superior]
-    # membership function
+##
+# Holds fuzzy control system.
+# 
+# For some reason the input and output variables including membership functions
+# are not part of the control system (static?!). Only rules are part of the
+# control system, variables are hided. So lets save everything needed into this
+# table.
+##
+fs = {}
 
-    # non-overlapping slots
+##
+# Initialization function for fuzzy evaluation.
+##
+def fuzzy_init(timetable):
+    global fs
+
+    # universe variables (inputs and outputs)
+    overlaps_range = [0, measures.count_possible_overlaps(timetable)]
+    overlaps = skfuzzy.control.Antecedent(np.arange(overlaps_range[0], overlaps_range[1], 1), 'overlaps')
+
+    equalslot_range = []
+    # TODO:
     # equal number of slots for each tutor
     # equal overall time at test for each tutor
     # no tutor changes (tutors should have consecutive slots in the same room)
 
-    # rules
-    # IF overlaps = unacceptable THEN evaluation = unacceptable
+    score_range = [0, 100]
+    score = skfuzzy.control.Consequent(np.arange(score_range[0], score_range[1], 1), 'score')
 
-    return 0.0
+    # membership functions (mappings)
+    overlaps['unacceptable'] = skfuzzy.trimf(overlaps.universe, [overlaps_range[0]+1, overlaps_range[1], overlaps_range[1]])
+    overlaps['superior'] = skfuzzy.trimf(overlaps.universe, [overlaps_range[0], overlaps_range[0], overlaps_range[0]+1])
+
+    score.automf(3)
+
+    overlaps.view()
+    score.view()
+
+    # fuzzy rules
+    rules = []
+    rules.append( skfuzzy.control.Rule(overlaps['unacceptable'], score['poor']) )
+    rules.append( skfuzzy.control.Rule(overlaps['superior'], score['good']) )
+
+    # create fuzzy control system
+    fs['scoring_ctrl'] = skfuzzy.control.ControlSystem(rules)
+
+
+##
+# Fuzzy evaluation function.
+##
+def fuzzy(timetable, loglevel=logging.INFO):
+    # init logger for this function
+    log = logging.getLogger("evaluation.fuzzy")
+    log.setLevel(loglevel)
+
+    # check if global variables are initialized
+    assert fs['scoring_ctrl'] is not None, "Fuzzy control system not initialized."
+
+    # compute score
+    scoring = skfuzzy.control.ControlSystemSimulation(fs['scoring_ctrl'])
+    scoring.input['overlaps'] = measures.count_overlaps(timetable)
+    scoring.compute()
+
+    log.debug('score: %.2f' %(scoring.output['score']))
+    return scoring.output['score']

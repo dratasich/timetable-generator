@@ -116,6 +116,10 @@ log.debug('config: evaluation function of genetic optimization = %s' % (eval_fun
 # Collects data about timetable.
 t = Timetable(start, args.test, rooms, tutors, args.groups)
 
+# Initialize evaluation functions if necessary.
+if eval_func_str == 'fuzzy':
+   evaluation.fuzzy_init(t)
+
 ##
 # Apply genome (map tutor to slot).
 ##

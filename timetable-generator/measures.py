@@ -49,6 +49,22 @@ def count_overlaps_of_tutor(timetable, tutor):
     return cnt
 
 ##
+# Returns the number of possible overlaps.
+##
+def count_possible_overlaps(timetable):
+    return len(timetable.get_slots()) * (len(timetable.rooms)-1)
+
+##
+# Returns total number of overlaps (overlap = tutor has two slots at the same
+# time).
+##
+def count_overlaps(timetable):
+    cnt = 0
+    for tutor in timetable.tutors:
+        cnt += count_overlaps_of_tutor(timetable, tutor)
+    return cnt
+
+##
 # Returns the difference between last and first slot of a tutor (in number
 # of slots), i.e., overall time in slots the tutor supervises the test.
 ##
