@@ -15,6 +15,26 @@ def count_slots_of_tutor(timetable, tutor):
     return len(slots)
 
 ##
+# Returns the sum of difference between the number of slots of all tutors.
+#
+# Worst case: When 1 tutor has all slots (the others have none), the difference
+# is (number of tutors - 1) * (number of slots). Best case: All tutors have the
+# same amount of slots, then the difference is 0.
+##
+def sum_up_slot_differences(timetable):
+    sumslots = 0
+    tutor_slot_cnt = []
+    # count slots of each tutor
+    for tutor in timetable.tutors:
+        c = count_slots_of_tutor(timetable, tutor)
+        tutor_slot_cnt.append(c)
+    # compare number of slots and sum up
+    for i in range(0, len(tutor_slot_cnt)):
+        for j in range(i, len(tutor_slot_cnt)):
+            sumslots += abs(tutor_slot_cnt[i]-tutor_slot_cnt[j])
+    return sumslots
+
+##
 # Returns slots with same start time.
 ##
 def get_concurrent_slots(timetable, start_time):

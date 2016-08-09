@@ -113,17 +113,20 @@ fs = {}
 
 ##
 # Initialization function for fuzzy evaluation.
+#
+# TODO: normalization needed?
 ##
 def fuzzy_init(timetable):
     global fs
 
     # universe variables (inputs and outputs)
+    slotdiff_range = [0, (len(timetable.tutors)-1)*len(timetable.get_slots())] # min: equal number of slots; max: a tutor can have all slots
+    slotdiff = skfuzzy.control.Antecedent(np.arange(slotdiff_range[0], slotdiff_range[1], 1), 'slotdiff')
+
     overlaps_range = [0, measures.count_possible_overlaps(timetable)]
     overlaps = skfuzzy.control.Antecedent(np.arange(overlaps_range[0], overlaps_range[1], 1), 'overlaps')
 
-    equalslot_range = []
     # TODO:
-    # equal number of slots for each tutor
     # equal overall time at test for each tutor
     # no tutor changes (tutors should have consecutive slots in the same room)
 
@@ -132,21 +135,34 @@ def fuzzy_init(timetable):
 
     # membership functions (mappings)
     overlaps['unacceptable'] = skfuzzy.trimf(overlaps.universe, [overlaps_range[0]+1, overlaps_range[1], overlaps_range[1]])
-    overlaps['superior'] = skfuzzy.trimf(overlaps.universe, [overlaps_range[0], overlaps_range[0], overlaps_range[0]+1])
+    overlaps['ok'] = skfuzzy.trimf(overlaps.universe, [overlaps_range[0], overlaps_range[0], overlaps_range[0]+1])
 
-    score.automf(3)
+    slotdiff['poor'] = skfuzzy.trimf(slotdiff.universe, [slotdiff_range[1]*0.2, slotdiff_range[1], slotdiff_range[1]])
+    slotdiff['average'] = skfuzzy.trimf(slotdiff.universe, [slotdiff_range[0], slotdiff_range[1]*0.2, slotdiff_range[1]*0.4])
+    slotdiff['good'] = skfuzzy.trimf(slotdiff.universe, [slotdiff_range[0], slotdiff_range[0], slotdiff_range[1]*0.2])
 
-    overlaps.view()
-    score.view()
+    score['unacceptable'] = skfuzzy.trapmf(score.universe, [score_range[0], score_range[0], score_range[0], score_range[1]*0.5])
+    score['poor'] = skfuzzy.trimf(score.universe, [score_range[1]*0.5, score_range[1]*0.7, score_range[1]*0.7])
+    score['average'] = skfuzzy.trimf(score.universe, [score_range[1]*0.7, score_range[1]*0.9, score_range[1]*0.9])
+    score['good'] = skfuzzy.trimf(score.universe, [score_range[1]*0.9, score_range[1], score_range[1]])
+
+    # overlaps.view()
+    # slotdiff.view()
+    # score.view()
 
     # fuzzy rules
     rules = []
-    rules.append( skfuzzy.control.Rule(overlaps['unacceptable'], score['poor']) )
-    rules.append( skfuzzy.control.Rule(overlaps['superior'], score['good']) )
+    rules.append( skfuzzy.control.Rule(overlaps['unacceptable'] & (slotdiff['poor'] | slotdiff['average'] | slotdiff['good']), score['unacceptable']) )
+    rules.append( skfuzzy.control.Rule(~overlaps['unacceptable'] & (slotdiff['poor']), score['poor']) )
+    rules.append( skfuzzy.control.Rule(~overlaps['unacceptable'] & (slotdiff['average']), score['average']) )
+    rules.append( skfuzzy.control.Rule(~overlaps['unacceptable'] & (slotdiff['good']), score['good']) )
+    # rules[0].view()
 
     # create fuzzy control system
     fs['scoring_ctrl'] = skfuzzy.control.ControlSystem(rules)
 
+    # for debugging
+    fs['score'] = score
 
 ##
 # Fuzzy evaluation function.
@@ -161,8 +177,16 @@ def fuzzy(timetable, loglevel=logging.INFO):
 
     # compute score
     scoring = skfuzzy.control.ControlSystemSimulation(fs['scoring_ctrl'])
-    scoring.input['overlaps'] = measures.count_overlaps(timetable)
+
+    scoring.input['overlaps'] = x_overlaps = measures.count_overlaps(timetable)
+    scoring.input['slotdiff'] = x_slotdiff = measures.sum_up_slot_differences(timetable)
+
     scoring.compute()
 
+    if loglevel == logging.DEBUG:
+        fs['score'].view(sim=scoring)
+
+    log.debug('overlaps: %.2f' %(x_overlaps))
+    log.debug('slot difference: %.2f' %(x_slotdiff))
     log.debug('score: %.2f' %(scoring.output['score']))
     return scoring.output['score']

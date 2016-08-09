@@ -190,3 +190,6 @@ print './test_timetable.sh ' + str(args.test) + ' "' + \
    str(args.groups) + ' ' + \
    room_nr + ' ' + OUTPUT_FILENAME
 print '**********************************************************'
+
+if log.getEffectiveLevel() == logging.DEBUG:
+   input("test")
