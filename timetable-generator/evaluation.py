@@ -70,7 +70,7 @@ def piecewise_linear(timetable, loglevel=logging.INFO):
     # no tutor changes (tutors should have consecutive slots in the same room)
     weight = 0.8
     maximum = len(timetable.get_slots()) - len(timetable.rooms)*2
-    reached = maximum - measures.count_tutor_changes(timetable)
+    reached = maximum - measures.count_room_changes(timetable)
     log.debug('[ %2.1f ] no tutor changes: %d / %d' % (weight, reached, maximum))
     score += weight * reached/maximum
     log.debug('score: %.2f' %(score))
@@ -178,15 +178,16 @@ def fuzzy(timetable, loglevel=logging.INFO):
     # compute score
     scoring = skfuzzy.control.ControlSystemSimulation(fs['scoring_ctrl'])
 
-    scoring.input['overlaps'] = x_overlaps = measures.count_overlaps(timetable)
-    scoring.input['slotdiff'] = x_slotdiff = measures.sum_up_slot_differences(timetable)
+    scoring.input['overlaps'] = measures.count_overlaps(timetable)
+    scoring.input['slotdiff'] = measures.sum_up_slot_differences(timetable)
+    scoring.input['testdiff'] = measures.sum_up_testlength_differences(timetable)
+    scoring.input['rchanges'] = measures.count_room_changes(timetable)
 
     scoring.compute()
 
     if loglevel == logging.DEBUG:
         fs['score'].view(sim=scoring)
 
-    log.debug('overlaps: %.2f' %(x_overlaps))
-    log.debug('slot difference: %.2f' %(x_slotdiff))
+    log.debug(measures.print_measures(timetable))
     log.debug('score: %.2f' %(scoring.output['score']))
     return scoring.output['score']

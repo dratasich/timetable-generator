@@ -11,7 +11,6 @@
 
 import logging
 import datetime
-import measures
 
 ####################
 # global variables #
@@ -271,17 +270,5 @@ class Timetable:
             for s in range(cols):
                 ret += '+----';
             ret += '+\n'
-
-        # number of slots per tutor
-        ret += '\n tutor     | #slots | testlen | #overlaps'
-        ret += '\n-----------+--------+---------+-----------\n'
-        for tutor in self.tutors:
-            ret += '%10.10s | %6d | %7d | %9d\n' % (tutor, 
-                                                    measures.count_slots_of_tutor(self, tutor),
-                                                    measures.get_test_length_for_tutor(self, tutor),
-                                                    measures.count_overlaps_of_tutor(self, tutor))
-
-        # count tutors in a row
-        ret += '\nNumber of tutor-changes: %d\n' % (measures.count_tutor_changes(self))
 
         return ret

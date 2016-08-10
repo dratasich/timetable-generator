@@ -85,6 +85,15 @@ def count_overlaps(timetable):
     return cnt
 
 ##
+# Returns overall test length in number of slots.
+##
+def get_test_length(timetable):
+    testlen = 0
+    for r in range(0, len(timetable.rooms)-1):
+        testlen = max(testlen, len(timetable._slot_matrix[r]))
+    return testlen
+
+##
 # Returns the difference between last and first slot of a tutor (in number
 # of slots), i.e., overall time in slots the tutor supervises the test.
 ##
@@ -100,9 +109,30 @@ def get_test_length_for_tutor(timetable, tutor):
     return (max_slot.start - min_slot.start).seconds/60 / timetable.slotlen + 1
 
 ##
+# Returns the sum of difference between the test length (i.e., duration from
+# first slot to last slot) of all tutors.
+#
+# Worst case: When 1 tutor has all slots (the others have none), the difference
+# is (number of tutors - 1) * (number of slots). Best case: All tutors have the
+# same amount of slots, then the difference is 0.
+##
+def sum_up_testlength_differences(timetable):
+    sumtestlen = 0
+    tutor_testlen = []
+    # test length of each tutor
+    for tutor in timetable.tutors:
+        c = get_test_length_for_tutor(timetable, tutor)
+        tutor_testlen.append(c)
+    # compare test length and sum up
+    for i in range(0, len(tutor_testlen)):
+        for j in range(i, len(tutor_testlen)):
+            sumtestlen += abs(tutor_testlen[i]-tutor_testlen[j])
+    return sumtestlen
+
+##
 # Count how many times the tutor changes in a room.
 ##
-def count_tutor_changes(timetable):
+def count_room_changes(timetable):
     rows = len(timetable._slot_matrix)
     cols = len(timetable._slot_matrix[0])
     changes = 0
@@ -146,3 +176,31 @@ def pause_slots_of_tutor(timetable, tutor):
 def pause_offset_to_testcenter_of_tutor(timetable, tutor):
     # TODO
     return 0
+
+def print_measures(timetable):
+    ret = ''
+
+    # tutor specific output
+    ret += '\n tutor     | #slots | testlen | #overlaps'
+    ret += '\n-----------+--------+---------+-----------\n'
+    for tutor in timetable.tutors:
+        ret += '%10.10s | %6d | %7d | %9d\n' % (tutor, 
+                                                count_slots_of_tutor(timetable, tutor),
+                                                get_test_length_for_tutor(timetable, tutor),
+                                                count_overlaps_of_tutor(timetable, tutor))
+    # sum up
+    ret += '-----------+--------+---------+-----------\n'
+    ret += '           | %6d | %7d | %9d\n' % (len(timetable.get_slots()), 
+                                               get_test_length(timetable),
+                                               count_overlaps(timetable))
+
+    # count tutors in a row
+    ret += '\n'
+    ret += 'slot difference: %d / %d\n' % (sum_up_slot_differences(timetable),
+                                           (len(timetable.tutors)-1)*len(timetable.get_slots()) )
+    ret += 'test length difference: %d / %d\n' % (sum_up_testlength_differences(timetable),
+                                                  (len(timetable.tutors)-1)*len(timetable.get_slots()))
+    ret += 'number of room changes: %d / %d\n' % (count_room_changes(timetable),
+                                                  len(timetable.get_slots())-len(timetable.rooms))
+
+    return ret
