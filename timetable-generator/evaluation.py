@@ -102,19 +102,17 @@ def piecewise_linear(timetable, loglevel=logging.INFO):
 #
 
 ##
-# Holds fuzzy control system.
+# Fuzzy control system.
 # 
 # For some reason the input and output variables including membership functions
-# are not part of the control system (static?!). Only rules are part of the
-# control system, variables are hided. So lets save everything needed into this
-# table.
+# are not part of the control system (static/global variables?!). Only rules
+# are part of the control system, variables are hided. So lets save everything
+# needed into this table.
 ##
 fs = {}
 
 ##
 # Initialization function for fuzzy evaluation.
-#
-# TODO: normalization needed?
 ##
 def fuzzy_init(timetable):
     global fs
@@ -123,12 +121,17 @@ def fuzzy_init(timetable):
     slotdiff_range = [0, (len(timetable.tutors)-1)*len(timetable.get_slots())] # min: equal number of slots; max: a tutor can have all slots
     slotdiff = skfuzzy.control.Antecedent(np.arange(slotdiff_range[0], slotdiff_range[1], 1), 'slotdiff')
 
+    testdiff_range = [0, (len(timetable.tutors)-1)*len(timetable.get_slots())]
+    testdiff = skfuzzy.control.Antecedent(np.arange(testdiff_range[0], testdiff_range[1], 1), 'testdiff')
+
     overlaps_range = [0, measures.count_possible_overlaps(timetable)]
     overlaps = skfuzzy.control.Antecedent(np.arange(overlaps_range[0], overlaps_range[1], 1), 'overlaps')
 
+    rchanges_range = [0, len(timetable.get_slots()) - len(timetable.rooms)] # max: each slot has another tutor (start slots per room are excluded)
+    rchanges = skfuzzy.control.Antecedent(np.arange(rchanges_range[0], rchanges_range[1], 1), 'rchanges')
+
     # TODO:
-    # equal overall time at test for each tutor
-    # no tutor changes (tutors should have consecutive slots in the same room)
+    # no holes
 
     score_range = [0, 100]
     score = skfuzzy.control.Consequent(np.arange(score_range[0], score_range[1], 1), 'score')
@@ -137,27 +140,84 @@ def fuzzy_init(timetable):
     overlaps['unacceptable'] = skfuzzy.trimf(overlaps.universe, [overlaps_range[0]+1, overlaps_range[1], overlaps_range[1]])
     overlaps['ok'] = skfuzzy.trimf(overlaps.universe, [overlaps_range[0], overlaps_range[0], overlaps_range[0]+1])
 
-    slotdiff['poor'] = skfuzzy.trimf(slotdiff.universe, [slotdiff_range[1]*0.2, slotdiff_range[1], slotdiff_range[1]])
-    slotdiff['average'] = skfuzzy.trimf(slotdiff.universe, [slotdiff_range[0], slotdiff_range[1]*0.2, slotdiff_range[1]*0.4])
-    slotdiff['good'] = skfuzzy.trimf(slotdiff.universe, [slotdiff_range[0], slotdiff_range[0], slotdiff_range[1]*0.2])
+    slotdiff['poor'] = skfuzzy.trimf(slotdiff.universe, [slotdiff_range[1]*0.15, slotdiff_range[1], slotdiff_range[1]])
+    slotdiff['average'] = skfuzzy.trimf(slotdiff.universe, [slotdiff_range[1]*0.03, slotdiff_range[1]*0.1, slotdiff_range[1]*0.17])
+    slotdiff['good'] = skfuzzy.trimf(slotdiff.universe, [slotdiff_range[0], slotdiff_range[0], slotdiff_range[1]*0.05])
 
-    score['unacceptable'] = skfuzzy.trapmf(score.universe, [score_range[0], score_range[0], score_range[0], score_range[1]*0.5])
-    score['poor'] = skfuzzy.trimf(score.universe, [score_range[1]*0.5, score_range[1]*0.7, score_range[1]*0.7])
-    score['average'] = skfuzzy.trimf(score.universe, [score_range[1]*0.7, score_range[1]*0.9, score_range[1]*0.9])
-    score['good'] = skfuzzy.trimf(score.universe, [score_range[1]*0.9, score_range[1], score_range[1]])
+    testdiff['poor'] = skfuzzy.trimf(testdiff.universe, [testdiff_range[1]*0.3, testdiff_range[1], testdiff_range[1]])
+    testdiff['average'] = skfuzzy.trimf(testdiff.universe, [testdiff_range[1]*0.05, testdiff_range[1]*0.2, testdiff_range[1]*0.35])
+    testdiff['good'] = skfuzzy.trimf(testdiff.universe, [testdiff_range[0], testdiff_range[0], testdiff_range[1]*0.1])
+
+    rchanges['poor'] = skfuzzy.trimf(rchanges.universe, [rchanges_range[1]*0.2, rchanges_range[1], rchanges_range[1]])
+    rchanges['average'] = skfuzzy.trimf(rchanges.universe, [rchanges_range[1]*0.05, rchanges_range[1]*0.15, rchanges_range[1]*0.25])
+    rchanges['good'] = skfuzzy.trimf(rchanges.universe, [rchanges_range[0], rchanges_range[0], rchanges_range[1]*0.1])
+
+    score['unacceptable'] = skfuzzy.trapmf(score.universe, [score_range[0], score_range[0], score_range[0], score_range[1]*0.25])
+    score['poor'] = skfuzzy.trimf(score.universe, [score_range[1]*0.25, score_range[1]*0.5, score_range[1]*0.5])
+    score['average'] = skfuzzy.trimf(score.universe, [score_range[1]*0.5, score_range[1]*0.75, score_range[1]*0.75])
+    score['good'] = skfuzzy.trimf(score.universe, [score_range[1]*0.75, score_range[1]*0.9, score_range[1]*0.9])
+    score['superior'] = skfuzzy.trimf(score.universe, [score_range[1]*0.9, score_range[1], score_range[1]])
 
     # overlaps.view()
     # slotdiff.view()
-    # score.view()
+    # testdiff.view()
+    # rchanges.view()
+    score.view()
 
     # fuzzy rules
     rules = []
-    rules.append( skfuzzy.control.Rule(overlaps['unacceptable'] & (slotdiff['poor'] | slotdiff['average'] | slotdiff['good']), score['unacceptable']) )
-    rules.append( skfuzzy.control.Rule(~overlaps['unacceptable'] & (slotdiff['poor']), score['poor']) )
-    rules.append( skfuzzy.control.Rule(~overlaps['unacceptable'] & (slotdiff['average']), score['average']) )
-    rules.append( skfuzzy.control.Rule(~overlaps['unacceptable'] & (slotdiff['good']), score['good']) )
-    # rules[0].view()
+    rules.append( skfuzzy.control.Rule(overlaps['unacceptable']
+                                       & (slotdiff['poor'] | slotdiff['average'] | slotdiff['good'])
+                                       & (testdiff['poor'] | testdiff['average'] | testdiff['good'])
+                                       & (rchanges['poor'] | rchanges['average'] | rchanges['good']),
+                                       score['unacceptable'],
+                                       "Any overlaps are unacceptable.") )
 
+    rules.append( skfuzzy.control.Rule(overlaps['ok']
+                                       & slotdiff['good']
+                                       & testdiff['good']
+                                       & rchanges['good'],
+                                       score['superior'],
+                                       "All is fine.") )
+
+    rules.append( skfuzzy.control.Rule(overlaps['ok']
+                                       & (slotdiff['poor'] | rchanges['poor']),
+                                       score['poor'],
+                                       "Slot difference and room changes should not be bad.") )
+
+    rules.append( skfuzzy.control.Rule(overlaps['ok']
+                                       & (slotdiff['average'] | rchanges['average'])
+                                       & testdiff['poor'],
+                                       score['poor']) )
+
+    rules.append( skfuzzy.control.Rule(overlaps['ok']
+                                       & (slotdiff['average'] | rchanges['average'])
+                                       & testdiff['average'],
+                                       score['average']) )
+
+    rules.append( skfuzzy.control.Rule(overlaps['ok']
+                                       & slotdiff['good']
+                                       & (rchanges['average'] | rchanges['good']),
+                                       score['good']) )
+
+    rules.append( skfuzzy.control.Rule(overlaps['ok']
+                                       & slotdiff['good']
+                                       & (rchanges['average'] | rchanges['good']),
+                                       score['good']) )
+
+    rules.append( skfuzzy.control.Rule(overlaps['ok']
+                                       & slotdiff['good']
+                                       & rchanges['good']
+                                       & (testdiff['poor'] | testdiff['average']),
+                                       score['good']) )
+
+    rules.append( skfuzzy.control.Rule(overlaps['ok']
+                                       & slotdiff['good']
+                                       & rchanges['good']
+                                       & (testdiff['average'] | testdiff['good']),
+                                       score['superior']) )
+
+    
     # create fuzzy control system
     fs['scoring_ctrl'] = skfuzzy.control.ControlSystem(rules)
 
