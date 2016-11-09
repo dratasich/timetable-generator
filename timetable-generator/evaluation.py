@@ -61,8 +61,8 @@ def piecewise_linear(timetable, loglevel=logging.INFO):
 
     # non-overlapping slots
     weight = 10.0
-    cnt, maximum = measures.count_overlaps(timetable)
-    reached = maximum - cnt
+    maximum = len(timetable.get_slots()) * (len(timetable.tutors))
+    reached = maximum - measures.count_overlaps(timetable)
     log.debug('[ %2.1f ] non-overlapping slots: %d / %d' % (weight, reached, maximum))
     score += weight * reached/maximum
     log.debug('score: %.2f' %(score))
